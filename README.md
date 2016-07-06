@@ -1,12 +1,12 @@
-### OCRPDF
+# OCRPDF
 
-# Motivation
+### Motivation
 Once I had a task of OCR'ing a number of scanned documents. Each document was in .pdf format and
 contained multiple scanned images. Given the number of files to process I decided to develop
 a program to automate this. I am leaving the source code of the program here in the hope that
 someone may find it useful.
 
-# Compilation
+### Compilation
 From the directory of the project do:
 ```
 go build -o ocrpdf ocrpdf.go
@@ -14,7 +14,7 @@ go build -o ocrpdf ocrpdf.go
 
 This creates executable file `ocrpdf`.
 
-# Invocation
+### Invocation
 Command line options:
 ```
 ocrpdf [-first n] [-last n] [-lang xxx] input-file.pdf
@@ -30,7 +30,7 @@ For example, to process a document from page 12 to page 26 in Russian:
 ./ocrpdf -first 12 -last 26 -lang rus some.pdf > document.txt
 ```
 
-# Setup
+### Setup
 Internally the program relies on the tool `pdfimages` to extract images from the input file, and on `tesseract`
 program to do the actual image to text conversion. The former tool is usually a part of `poppler-utils` package,
 while the latter is included in `tesseract-ocr` package. By default, the `tesseract` tool comes with the English
@@ -38,7 +38,7 @@ language support only, other languages should be installed separately, for examp
 to install the Russian language support. To find out what languages are currently installed type
 `tesseract --list-langs`.
 
-#Details
+### Details
 The tool first runs the `pdfimages` program to extract images to a temporary directory, and then invokes
 `tesseract` on each image in parallel, assembling the output in the original order and directing it to stdout.
 The resulting text has any trailing white-space stripped, otherwise there is no processing done to it. Sometimes,
@@ -50,6 +50,7 @@ The result is usually less than ideal, it depends on the original text and the q
 so don't expect it to replace a human editor. The script takes its input from stdin and produces output to stdout.
 
 
-Lisence: BSD
-Platform: Linux (tested on Linux Mint 18 64bit)
+###### Lisence: BSD
+
+###### Platform: Linux (tested on Linux Mint 18 64bit)
 
