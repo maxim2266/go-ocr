@@ -1,4 +1,5 @@
 # OCRPDF
+A tool for extracting text from scanned documents.
 
 ### Motivation
 Once I had a task of OCR'ing a number of scanned documents. Each document was in .pdf format and
