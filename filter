@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+
+from sys import stdin
+import re
+from functools import reduce
+from operator import not_
+
+# raw input with simple substitution
+def read_lines(input):
+	dash_re = re.compile(r'[—_-]{2,}')
+	space_re = re.compile(r'\s+')
+	artifacts_re = re.compile(r'\s+[\'’"`,›]$')
+	filters = ( lambda x: space_re.sub(' ', x),	\
+				lambda x: dash_re.sub('—', x),	\
+				lambda x: x.replace('...', '…'),	\
+				lambda x: artifacts_re.sub('', x) )
+	for s in input:
+		s = s.rstrip()
+		yield reduce(lambda x,f: f(x), filters, s) if s else ''
+
+# filter page numbers
+def filter_page_numbers(input):
+	pnum_re = re.compile(r"\d{1,4}[\w\-']*")
+	str_stack = []
+	tests = ( not_, pnum_re.match, not_ )
+
+	for s in input:
+		if tests[len(str_stack)](s):
+			str_stack.append(s)
+			if len(str_stack) == len(tests):
+				str_stack.clear()	# skipped page number
+			continue
+		if str_stack:
+			yield from str_stack
+			str_stack.clear()
+		yield s
+
+	yield from str_stack
+
+# join words
+def ends_with_split_word(s):
+	return len(s) > 2 and s[-1] in ('—', '-') and s[-2].isalpha()
+
+def join_words_simple(input):
+	curr = ''
+	for s in input:
+		if s:
+			if ends_with_split_word(s):
+				curr += s[:-1]
+			elif curr:
+				yield curr + s
+				curr = ''
+			else:
+				yield s
+		else:
+			if curr:
+				yield curr + '-'
+				curr = ''
+			yield ''
+
+	if curr:
+		yield curr + '-'
+
+def filter_newlines(input):
+	flag = False
+	for s in input:
+		if s:
+			flag = ends_with_split_word(s)
+			yield s
+		elif not flag:
+			yield ''
+
+def join_words(input):
+	yield from join_words_simple(filter_newlines(input))
+
+# join lines
+def join_lines(input):
+	save = []
+	for s in input:
+		if s:
+			save.append(s)
+			continue
+		if save:
+			yield ' '.join(save)
+			save.clear()
+		yield ''
+
+	if save:
+		yield ' '.join(save)
+
+
+# test
+for s in join_lines(join_words(filter_page_numbers(read_lines(stdin)))):
+	print(s)
+
