@@ -117,7 +117,7 @@ def join_lines(input):
 		yield ' '.join(save)
 
 
-# test
+# apply all filters to the input from stdin
 for s in join_lines(join_words(filter_page_numbers(read_lines(stdin)))):
 	print(s)
 
