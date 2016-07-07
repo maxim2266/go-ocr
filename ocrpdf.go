@@ -44,6 +44,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"text/scanner"
 	"unicode"
 )
 
@@ -66,9 +67,14 @@ func main() {
 		die("Too many input files")
 	}
 
-	if err := run(); err != nil {
+	//	if err := run(); err != nil {
+	//		die(err.Error())
+	//	}
+
+	if _, err := makeFilters("filter-rus"); err != nil {
 		die(err.Error())
 	}
+
 }
 
 func run() error {
@@ -271,4 +277,49 @@ func errMsg(buff *bytes.Buffer, reqNo uint) string {
 func die(msg string) {
 	fmt.Fprintln(os.Stderr, "ERROR:", msg)
 	os.Exit(1)
+}
+
+// filter definition reader
+func makeFilters(fileName string) (filters []func([]byte) []byte, err error) {
+	// input file reader
+	var file *os.File
+
+	if file, err = os.Open(fileName); err != nil {
+		return
+	}
+
+	defer file.Close()
+
+	// error processor
+	defer func() {
+		if e := recover(); e != nil {
+			if msg, ok := e.(tokeniserError); ok {
+				err = errors.New(string(msg))
+			} else {
+				panic(e)
+			}
+		}
+	}()
+
+	// tokeniser
+	tokeniser := new(scanner.Scanner).Init(file)
+
+	tokeniser.Mode = scanner.SkipComments | scanner.ScanComments | scanner.ScanIdents | scanner.ScanStrings | scanner.ScanRawStrings
+	//		tokeniser.Whitespace : 1<<'\t' | 1<<'\r' | 1<<' '
+	tokeniser.Error = tokeniserErrorFunc
+	tokeniser.Filename = fileName
+
+	// process input file
+	for tok := tokeniser.Scan(); tok != scanner.EOF; tok = tokeniser.Scan() {
+		println(scanner.TokenString(tok), "->", tokeniser.TokenText())
+	}
+
+	return
+}
+
+type tokeniserError string
+
+func tokeniserErrorFunc(s *scanner.Scanner, msg string) {
+	msg = fmt.Sprintf("Filter definition file \"%s\", line %d: %s.", s.Filename, s.Line, msg)
+	panic(tokeniserError(msg))
 }
