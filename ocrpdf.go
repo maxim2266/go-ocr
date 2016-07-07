@@ -104,6 +104,7 @@ func run() error {
 	})
 }
 
+// 'pdfimages' driver
 func extractImages(dir string) error {
 	// "$extractor" $from $to "$input" $tmp_dir/
 	args := []string{"-f", strconv.Itoa(int(firstPage))}
@@ -129,6 +130,7 @@ func extractImages(dir string) error {
 	return err
 }
 
+// request/response data structures for parallel ocr
 type ocrRequest struct {
 	no    uint
 	image string
@@ -141,6 +143,7 @@ type ocrResult struct {
 	text bytes.Buffer
 }
 
+// heap of ocrResult structures for restoring the original page order
 type resultHeap []*ocrResult
 
 func (h resultHeap) Len() int           { return len(h) }
@@ -156,6 +159,7 @@ func (h *resultHeap) Pop() interface{} {
 	return val
 }
 
+// OCR driver
 func ocr(dir string, f func([]byte) error) error {
 	// list all image files
 	files, err := filepath.Glob(dir + "*.pbm")
@@ -258,6 +262,7 @@ func ocr(dir string, f func([]byte) error) error {
 	return nil
 }
 
+// little helper functions
 func errMsg(buff *bytes.Buffer, reqNo uint) string {
 	s, _ := buff.ReadString('\n')
 	return fmt.Sprintf("(page %d) %s", reqNo+firstPage, strings.TrimSpace(s))
