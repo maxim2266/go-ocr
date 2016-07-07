@@ -39,6 +39,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
@@ -302,24 +303,87 @@ func makeFilters(fileName string) (filters []func([]byte) []byte, err error) {
 	}()
 
 	// tokeniser
-	tokeniser := new(scanner.Scanner).Init(file)
+	tok := new(scanner.Scanner).Init(file)
 
-	tokeniser.Mode = scanner.SkipComments | scanner.ScanComments | scanner.ScanIdents | scanner.ScanStrings | scanner.ScanRawStrings
-	//		tokeniser.Whitespace : 1<<'\t' | 1<<'\r' | 1<<' '
-	tokeniser.Error = tokeniserErrorFunc
-	tokeniser.Filename = fileName
+	tok.Mode = scanner.SkipComments | scanner.ScanComments | scanner.ScanIdents | scanner.ScanStrings | scanner.ScanRawStrings
+	tok.Whitespace = 1<<'\t' | 1<<'\r' | 1<<' '
+	tok.Error = tokeniserErrorFunc
+	tok.Filename = fileName
 
 	// process input file
-	for tok := tokeniser.Scan(); tok != scanner.EOF; tok = tokeniser.Scan() {
-		println(scanner.TokenString(tok), "->", tokeniser.TokenText())
+	for t := skipNewLines(tok); t != scanner.EOF; {
+		if t != scanner.Ident {
+			err = errInvalidToken(tok, "filter type", t)
+			return
+		}
+
+		fltType := tok.TokenText()
+
+		switch fltType {
+		case "line":
+			// ok
+		case "text":
+			// ok
+		case "word":
+			// ok
+		default:
+			err = errors.New(errorMessage(tok, "Unrecognised filter type: "+fltType))
+			return
+		}
+
+		if t = tok.Scan(); t != scanner.String {
+			err = errInvalidToken(tok, "filter regular expression", t)
+			return
+		}
+
+		//		var fltRegex *regexp.Regexp
+
+		if _, err = regexp.Compile(tok.TokenText()); err != nil {
+			err = errors.New(errorMessage(tok, err.Error()))
+			return
+		}
+
+		if t = tok.Scan(); t != scanner.String {
+			err = errInvalidToken(tok, "filter substitution string", t)
+			return
+		}
+
+		switch t = tok.Scan(); t {
+		case '\n':
+			t = skipNewLines(tok)
+		case scanner.EOF:
+			// nothing to do
+		default:
+			err = errInvalidToken(tok, "newline", t)
+			return
+		}
 	}
 
 	return
 }
 
+// internal tokeniser error handling
 type tokeniserError string
 
-func tokeniserErrorFunc(s *scanner.Scanner, msg string) {
-	msg = fmt.Sprintf("Filter definition file \"%s\", line %d: %s.", s.Filename, s.Line, msg)
-	panic(tokeniserError(msg))
+func tokeniserErrorFunc(tok *scanner.Scanner, msg string) {
+	panic(tokeniserError(errorMessage(tok, msg)))
+}
+
+// error reporting
+func errorMessage(tok *scanner.Scanner, msg string) string {
+	return fmt.Sprintf("Filter definition file \"%s\", line %d: %s.", tok.Filename, tok.Line, msg)
+}
+
+func errInvalidToken(tok *scanner.Scanner, msg string, t rune) error {
+	msg = fmt.Sprintf("Expected %s, but found %s", msg, strconv.Quote(tok.TokenText()))
+	return errors.New(errorMessage(tok, msg))
+}
+
+// filter spec parser support
+func skipNewLines(tok *scanner.Scanner) (t rune) {
+	for t = tok.Scan(); t == '\n'; t = tok.Scan() {
+		// empty
+	}
+
+	return
 }

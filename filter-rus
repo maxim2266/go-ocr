@@ -1,0 +1,6 @@
+// This is a comment
+
+line `[a-z]+\n\-`  "xxx\n"
+
+word "abc" "xyz"
+
