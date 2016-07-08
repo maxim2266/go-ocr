@@ -113,7 +113,6 @@ func run() error {
 
 // 'pdfimages' driver
 func extractImages(dir string) error {
-	// "$extractor" $from $to "$input" $tmp_dir/
 	args := []string{"-tiff", "-f", strconv.Itoa(int(firstPage))}
 
 	if lastPage >= firstPage {
@@ -201,7 +200,6 @@ func ocr(dir string, f func([]byte) error) error {
 					req: *req,
 				}
 
-				// "$ocr" "$image" - $lang
 				cmd := exec.Command("tesseract", req.image, "-", "-l", language)
 				cmd.Stdout = &resp.text
 				cmd.Stderr = &msg
@@ -302,6 +300,12 @@ func makeFilters(fileName string) (filters []func([]byte) []byte, err error) {
 	tok.Whitespace = 1<<'\t' | 1<<'\r' | 1<<' '
 	tok.Error = tokeniserErrorFunc
 	tok.Filename = fileName
+
+	// Filter spec format
+	//	scope '/' type `match` `replacement`
+	// where
+	//	scope: 'line' | 'text'
+	//	type:	'word' | 'regex'
 
 	// process input file
 	for t := skipNewLines(tok); t != scanner.EOF; {
