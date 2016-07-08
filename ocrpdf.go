@@ -107,9 +107,9 @@ func run() error {
 // 'pdfimages' driver
 func extractImages(dir string) error {
 	// "$extractor" $from $to "$input" $tmp_dir/
-	args := []string{"-f", strconv.Itoa(int(firstPage))}
+	args := []string{"-tiff", "-f", strconv.Itoa(int(firstPage))}
 
-	if lastPage > firstPage {
+	if lastPage >= firstPage {
 		args = append(args, "-l", strconv.Itoa(int(lastPage)))
 	}
 
@@ -139,7 +139,6 @@ type ocrRequest struct {
 type ocrResult struct {
 	req  ocrRequest
 	err  error
-	warn string
 	text bytes.Buffer
 }
 
@@ -162,7 +161,7 @@ func (h *resultHeap) Pop() interface{} {
 // OCR driver
 func ocr(dir string, f func([]byte) error) error {
 	// list all image files
-	files, err := filepath.Glob(dir + "*.pbm")
+	files, err := filepath.Glob(dir + "*.tif")
 	if err != nil {
 		return err
 	}
@@ -204,8 +203,6 @@ func ocr(dir string, f func([]byte) error) error {
 					if _, ok := resp.err.(*exec.ExitError); ok && msg.Len() > 0 {
 						resp.err = errors.New(errMsg(&msg, req.no))
 					}
-				} else if msg.Len() > 0 {
-					resp.warn = errMsg(&msg, req.no)
 				}
 
 				results <- resp
@@ -241,10 +238,6 @@ func ocr(dir string, f func([]byte) error) error {
 
 		for ; len(h) > 0 && h[0].req.no == i; i++ {
 			r := heap.Pop(&h).(*ocrResult)
-
-			if len(r.warn) > 0 {
-				fmt.Fprintln(os.Stderr, "WARNING:", r.warn)
-			}
 
 			// process the result
 			for s, _ := r.text.ReadBytes('\n'); len(s) > 0; s, _ = r.text.ReadBytes('\n') {
