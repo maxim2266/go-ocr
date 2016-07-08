@@ -147,7 +147,7 @@ func (req *ocrRequest) process() (text []byte, err error) {
 		msg := fmt.Sprintf("(page %d) ", req.no+firstPage)
 
 		if e, ok := err.(*exec.ExitError); ok {
-			if n := bytes.IndexByte(e.Stderr, '\n'); n > 0 { // get first line only
+			if n := bytes.IndexByte(e.Stderr, '\n'); n >= 0 { // get first line only
 				e.Stderr = e.Stderr[:n]
 			}
 
