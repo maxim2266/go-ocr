@@ -43,7 +43,6 @@ import (
 	"runtime"
 	"sort"
 	"strconv"
-	"strings"
 	"sync"
 	"text/scanner"
 	"unicode"
@@ -75,7 +74,6 @@ func main() {
 	if _, err := makeFilters("filter-rus"); err != nil {
 		die(err.Error())
 	}
-
 }
 
 func run() error {
@@ -142,10 +140,38 @@ type ocrRequest struct {
 	image string
 }
 
+func (req *ocrRequest) process() (text []byte, err error) {
+	text, err = exec.Command("tesseract", req.image, "-", "-l", language).Output()
+
+	if err != nil {
+		msg := fmt.Sprintf("(page %d) ", req.no+firstPage)
+
+		if e, ok := err.(*exec.ExitError); ok {
+			if n := bytes.IndexByte(e.Stderr, '\n'); n > 0 { // get first line only
+				e.Stderr = e.Stderr[:n]
+			}
+
+			msg += string(bytes.TrimSpace(e.Stderr))
+		} else {
+			msg += err.Error()
+		}
+
+		err = errors.New(msg)
+	}
+
+	return
+}
+
 type ocrResult struct {
 	req  ocrRequest
 	err  error
-	text bytes.Buffer
+	text []byte
+}
+
+func processOCRRequest(req *ocrRequest) (r *ocrResult) {
+	r = &ocrResult{req: *req}
+	r.text, r.err = req.process()
+	return
 }
 
 // heap of ocrResult structures for restoring the original page order
@@ -193,25 +219,8 @@ func ocr(dir string, f func([]byte) error) error {
 		go func() {
 			defer wg.Done()
 
-			var msg bytes.Buffer
-
 			for req := range requests {
-				resp := &ocrResult{
-					req: *req,
-				}
-
-				cmd := exec.Command("tesseract", req.image, "-", "-l", language)
-				cmd.Stdout = &resp.text
-				cmd.Stderr = &msg
-
-				if resp.err = cmd.Run(); resp.err != nil {
-					if _, ok := resp.err.(*exec.ExitError); ok && msg.Len() > 0 {
-						resp.err = errors.New(errMsg(&msg, req.no))
-					}
-				}
-
-				results <- resp
-				msg.Reset()
+				results <- processOCRRequest(req)
 			}
 		}()
 	}
@@ -235,17 +244,19 @@ func ocr(dir string, f func([]byte) error) error {
 	heap.Init(&h)
 
 	for r := range results {
-		if r.err != nil {
-			return r.err
-		}
-
 		heap.Push(&h, r)
 
 		for ; len(h) > 0 && h[0].req.no == i; i++ {
-			r := heap.Pop(&h).(*ocrResult)
+			r = heap.Pop(&h).(*ocrResult)
+
+			if r.err != nil {
+				return r.err
+			}
 
 			// process the result
-			for s, _ := r.text.ReadBytes('\n'); len(s) > 0; s, _ = r.text.ReadBytes('\n') {
+			reader := bytes.NewBuffer(r.text)
+
+			for s, _ := reader.ReadBytes('\n'); len(s) > 0; s, _ = reader.ReadBytes('\n') {
 				if err = f(bytes.TrimRightFunc(s, unicode.IsSpace)); err != nil {
 					return err
 				}
@@ -261,11 +272,6 @@ func ocr(dir string, f func([]byte) error) error {
 }
 
 // little helper functions
-func errMsg(buff *bytes.Buffer, reqNo uint) string {
-	s, _ := buff.ReadString('\n')
-	return fmt.Sprintf("(page %d) %s", reqNo+firstPage, strings.TrimSpace(s))
-}
-
 func die(msg string) {
 	fmt.Fprintln(os.Stderr, "ERROR:", msg)
 	os.Exit(1)
