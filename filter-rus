@@ -1,6 +1,6 @@
 // This is a comment
 
-line `[a-z]+\n\-`  "xxx\n"
+line regex	`(`  "xxx\n"
+line regex	`[a-z]+\n\-`  "xxx\n"
 
-word "abc" "xyz"
-
+text word 	"abc" "xyz"

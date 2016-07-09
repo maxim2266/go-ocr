@@ -34,6 +34,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -71,7 +72,7 @@ func main() {
 	//		die(err.Error())
 	//	}
 
-	if _, err := makeFilters("filter-rus"); err != nil {
+	if _, _, err := makeFilters("filter-rus"); err != nil {
 		die(err.Error())
 	}
 }
@@ -271,14 +272,8 @@ func ocr(dir string, f func([]byte) error) error {
 	return nil
 }
 
-// little helper functions
-func die(msg string) {
-	fmt.Fprintln(os.Stderr, "ERROR:", msg)
-	os.Exit(1)
-}
-
 // filter definition reader
-func makeFilters(fileName string) (filters []func([]byte) []byte, err error) {
+func makeFilters(fileName string) (lineFilter, textFilter func([]byte) []byte, err error) {
 	// input file reader
 	var file *os.File
 
@@ -288,105 +283,166 @@ func makeFilters(fileName string) (filters []func([]byte) []byte, err error) {
 
 	defer file.Close()
 
-	// error processor
-	defer func() {
-		if e := recover(); e != nil {
-			if msg, ok := e.(tokeniserError); ok {
-				err = errors.New(string(msg))
-			} else {
-				panic(e)
-			}
-		}
-	}()
-
 	// tokeniser
-	tok := new(scanner.Scanner).Init(file)
-
-	tok.Mode = scanner.SkipComments | scanner.ScanComments | scanner.ScanIdents | scanner.ScanStrings | scanner.ScanRawStrings
-	tok.Whitespace = 1<<'\t' | 1<<'\r' | 1<<' '
-	tok.Error = tokeniserErrorFunc
-	tok.Filename = fileName
+	tok := makeTokeniser(file, func(t *scanner.Scanner, msg string) {
+		msg = fmt.Sprintf("Filter definition file \"%s\", line %d: %s.", fileName, t.Line, msg)
+		err = errors.New(msg)
+	})
 
 	// Filter spec format
-	//	scope '/' type `match` `replacement`
+	//	scope type `match` `replacement`
 	// where
 	//	scope: 'line' | 'text'
 	//	type:	'word' | 'regex'
 
-	// process input file
+	var lineFilters, textFilters []func([]byte) []byte
+
+	// parser
 	for t := skipNewLines(tok); t != scanner.EOF; {
+		// scope
 		if t != scanner.Ident {
-			err = errInvalidToken(tok, "filter type", t)
+			errInvalidToken(tok, "filter scope", t)
 			return
 		}
 
-		fltType := tok.TokenText()
+		scope := tok.TokenText()
 
-		switch fltType {
-		case "line":
-			// ok
-		case "text":
-			// ok
+		// filter type
+		if t = tok.Scan(); t != scanner.Ident {
+			errInvalidToken(tok, "filter type", t)
+			return
+		}
+
+		filterType := tok.TokenText()
+
+		// regex or word
+		if t = tok.Scan(); t != scanner.String {
+			errInvalidToken(tok, "regular expression or word", t)
+			return
+		}
+
+		match := tok.TokenText()
+		match = match[1 : len(match)-1]
+
+		if len(match) == 0 {
+			tok.Error(tok, "Regular expression or word cannot be empty")
+			return
+		}
+
+		// substitution
+		if t = tok.Scan(); t != scanner.String {
+			errInvalidToken(tok, "substitution string", t)
+			return
+		}
+
+		subst := tok.TokenText()
+		subst = subst[1 : len(subst)-1]
+
+		println("###", match, subst)
+
+		// create filter function
+		var filterFunc func([]byte) []byte
+
+		switch filterType {
 		case "word":
-			// ok
+			filterFunc = makeWordFilter([]byte(match), []byte(subst))
+		case "regex":
+			if re, e := regexp.Compile(match); e != nil {
+				tok.Error(tok, e.Error())
+				return
+			} else {
+				filterFunc = makeRegexFilter(re, []byte(subst))
+			}
 		default:
-			err = errors.New(errorMessage(tok, "Unrecognised filter type: "+fltType))
+			tok.Error(tok, "Unknown filter type: "+filterType)
 			return
 		}
 
-		if t = tok.Scan(); t != scanner.String {
-			err = errInvalidToken(tok, "filter regular expression", t)
+		switch scope {
+		case "line":
+			lineFilters = append(lineFilters, filterFunc)
+		case "text":
+			textFilters = append(textFilters, filterFunc)
+		default:
+			tok.Error(tok, "Unknown filter scope: "+scope)
 			return
 		}
 
-		//		var fltRegex *regexp.Regexp
-
-		if _, err = regexp.Compile(tok.TokenText()); err != nil {
-			err = errors.New(errorMessage(tok, err.Error()))
-			return
-		}
-
-		if t = tok.Scan(); t != scanner.String {
-			err = errInvalidToken(tok, "filter substitution string", t)
-			return
-		}
-
+		// newline or EOF
 		switch t = tok.Scan(); t {
-		case '\n':
-			t = skipNewLines(tok)
 		case scanner.EOF:
 			// nothing to do
+		case '\n':
+			t = skipNewLines(tok)
 		default:
-			err = errInvalidToken(tok, "newline", t)
+			errInvalidToken(tok, "newline", t)
 			return
 		}
 	}
 
+	// make filters
+	lineFilter = makeFilter(lineFilters)
+	textFilter = makeFilter(textFilters)
 	return
 }
 
-// internal tokeniser error handling
-type tokeniserError string
+func makeTokeniser(file io.Reader, errFunc func(*scanner.Scanner, string)) *scanner.Scanner {
+	tok := new(scanner.Scanner).Init(file)
 
-func tokeniserErrorFunc(tok *scanner.Scanner, msg string) {
-	panic(tokeniserError(errorMessage(tok, msg)))
+	tok.Mode = scanner.SkipComments | scanner.ScanComments | scanner.ScanIdents | scanner.ScanStrings | scanner.ScanRawStrings
+	tok.Whitespace = 1<<'\t' | 1<<'\r' | 1<<' '
+	tok.Error = errFunc
+	return tok
 }
 
-// error reporting
-func errorMessage(tok *scanner.Scanner, msg string) string {
-	return fmt.Sprintf("Filter definition file \"%s\", line %d: %s.", tok.Filename, tok.Line, msg)
+func errInvalidToken(tok *scanner.Scanner, msg string, t rune) {
+	tok.Error(tok, fmt.Sprintf("Expected %s, but found %s", msg, strconv.Quote(tok.TokenText())))
 }
 
-func errInvalidToken(tok *scanner.Scanner, msg string, t rune) error {
-	msg = fmt.Sprintf("Expected %s, but found %s", msg, strconv.Quote(tok.TokenText()))
-	return errors.New(errorMessage(tok, msg))
-}
-
-// filter spec parser support
 func skipNewLines(tok *scanner.Scanner) (t rune) {
 	for t = tok.Scan(); t == '\n'; t = tok.Scan() {
 		// empty
 	}
 
 	return
+}
+
+func makeWordFilter(match, subst []byte) func([]byte) []byte {
+	return func(s []byte) []byte {
+		return bytes.Replace(s, match, subst, -1)
+	}
+}
+
+func makeRegexFilter(re *regexp.Regexp, subst []byte) func([]byte) []byte {
+	return func(s []byte) []byte {
+		return re.ReplaceAll(s, subst)
+	}
+}
+
+func makeFilter(filters []func([]byte) []byte) func([]byte) []byte {
+	if len(filters) == 0 {
+		return dummyFilter
+	}
+
+	return func(s []byte) []byte {
+		if len(s) > 0 {
+			for _, f := range filters {
+				if s = f(s); len(s) == 0 {
+					break
+				}
+			}
+		}
+
+		return s
+	}
+}
+
+func dummyFilter(s []byte) []byte {
+	return s
+}
+
+// little helper functions
+func die(msg string) {
+	fmt.Fprintln(os.Stderr, "ERROR:", msg)
+	os.Exit(1)
 }
