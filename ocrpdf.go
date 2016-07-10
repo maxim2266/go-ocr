@@ -34,29 +34,29 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
-	"text/scanner"
 	"unicode"
 )
 
 var firstPage, lastPage uint
 var inputFileName, language string
+var filterSpecs filterNames
 
 func main() {
 	// command line parameters
 	flag.UintVar(&firstPage, "first", 1, "First page number")
 	flag.UintVar(&lastPage, "last", 0, "Last page number")
 	flag.StringVar(&language, "lang", "eng", "Document language")
+	flag.Var(&filterSpecs, "filter", "Filter specification file name")
 	flag.Parse()
 
 	switch flag.NArg() {
@@ -68,20 +68,33 @@ func main() {
 		die("Too many input files")
 	}
 
-	//	if err := run(); err != nil {
-	//		die(err.Error())
-	//	}
+	// read filters
+	lineFilter, textFilter, err := makeFilters()
 
-	if _, _, err := makeFilters("filter-rus"); err != nil {
+	if err != nil {
+		die(err.Error())
+	}
+
+	// OCR
+	var text bytes.Buffer
+
+	if err = extractText(&text, lineFilter); err != nil {
+		die(err.Error())
+	}
+
+	// apply full-text filter
+	if _, err = os.Stdout.Write(textFilter(text.Bytes())); err != nil {
 		die(err.Error())
 	}
 }
 
-func run() error {
+func extractText(text *bytes.Buffer, filter func([]byte) []byte) (err error) {
 	// temporary directory
-	dir, err := ioutil.TempDir("", "ocr-")
+	var dir string
+
+	dir, err = ioutil.TempDir("", "ocr-")
 	if err != nil {
-		return err
+		return
 	}
 
 	dir = filepath.FromSlash(dir + "/") // make sure we have trailing slash
@@ -100,14 +113,11 @@ func run() error {
 
 	// extract images from input file
 	if err = extractImages(dir); err != nil {
-		return err
+		return
 	}
 
 	// OCR
-	return ocr(dir, func(text []byte) error {
-		_, e := os.Stdout.Write(append(text, '\n'))
-		return e
-	})
+	return ocr(dir, text, filter)
 }
 
 // 'pdfimages' driver
@@ -192,7 +202,7 @@ func (h *resultHeap) Pop() interface{} {
 }
 
 // OCR driver
-func ocr(dir string, f func([]byte) error) error {
+func ocr(dir string, text *bytes.Buffer, filter func([]byte) []byte) error {
 	// list all image files
 	files, err := filepath.Glob(dir + "*.tif")
 	if err != nil {
@@ -258,7 +268,11 @@ func ocr(dir string, f func([]byte) error) error {
 			reader := bytes.NewBuffer(r.text)
 
 			for s, _ := reader.ReadBytes('\n'); len(s) > 0; s, _ = reader.ReadBytes('\n') {
-				if err = f(bytes.TrimRightFunc(s, unicode.IsSpace)); err != nil {
+				if _, err := text.Write(filter(bytes.TrimRightFunc(s, unicode.IsSpace))); err != nil {
+					return err
+				}
+
+				if err := text.WriteByte('\n'); err != nil {
 					return err
 				}
 			}
@@ -272,156 +286,37 @@ func ocr(dir string, f func([]byte) error) error {
 	return nil
 }
 
-// filter definition reader
-func makeFilters(fileName string) (lineFilter, textFilter func([]byte) []byte, err error) {
-	// input file reader
-	var file *os.File
+// little helpers
+func die(msg string) {
+	fmt.Fprintln(os.Stderr, "ERROR:", msg)
+	os.Exit(1)
+}
 
-	if file, err = os.Open(fileName); err != nil {
-		return
-	}
+func makeFilters() (lineFilter, textFilter func([]byte) []byte, err error) {
+	filters := new(filterList)
 
-	defer file.Close()
+	for _, name := range filterSpecs {
+		var file *os.File
 
-	// tokeniser
-	tok := makeTokeniser(file, func(t *scanner.Scanner, msg string) {
-		msg = fmt.Sprintf("Filter definition file \"%s\", line %d: %s.", fileName, t.Line, msg)
-		err = errors.New(msg)
-	})
-
-	// Filter spec format
-	//	scope type `match` `replacement`
-	// where
-	//	scope: 'line' | 'text'
-	//	type:	'word' | 'regex'
-
-	var lineFilters, textFilters []func([]byte) []byte
-
-	// parser
-	for t := skipNewLines(tok); t != scanner.EOF; {
-		// scope
-		if t != scanner.Ident {
-			errInvalidToken(tok, "filter scope", t)
+		if file, err = os.Open(name); err != nil {
 			return
 		}
 
-		scope := tok.TokenText()
+		defer file.Close()
 
-		// filter type
-		if t = tok.Scan(); t != scanner.Ident {
-			errInvalidToken(tok, "filter type", t)
-			return
-		}
-
-		filterType := tok.TokenText()
-
-		// regex or word
-		if t = tok.Scan(); t != scanner.String {
-			errInvalidToken(tok, "regular expression or word", t)
-			return
-		}
-
-		match := tok.TokenText()
-		match = match[1 : len(match)-1]
-
-		if len(match) == 0 {
-			tok.Error(tok, "Regular expression or word cannot be empty")
-			return
-		}
-
-		// substitution
-		if t = tok.Scan(); t != scanner.String {
-			errInvalidToken(tok, "substitution string", t)
-			return
-		}
-
-		subst := tok.TokenText()
-		subst = subst[1 : len(subst)-1]
-
-		println("###", match, subst)
-
-		// create filter function
-		var filterFunc func([]byte) []byte
-
-		switch filterType {
-		case "word":
-			filterFunc = makeWordFilter([]byte(match), []byte(subst))
-		case "regex":
-			if re, e := regexp.Compile(match); e != nil {
-				tok.Error(tok, e.Error())
-				return
-			} else {
-				filterFunc = makeRegexFilter(re, []byte(subst))
-			}
-		default:
-			tok.Error(tok, "Unknown filter type: "+filterType)
-			return
-		}
-
-		switch scope {
-		case "line":
-			lineFilters = append(lineFilters, filterFunc)
-		case "text":
-			textFilters = append(textFilters, filterFunc)
-		default:
-			tok.Error(tok, "Unknown filter scope: "+scope)
-			return
-		}
-
-		// newline or EOF
-		switch t = tok.Scan(); t {
-		case scanner.EOF:
-			// nothing to do
-		case '\n':
-			t = skipNewLines(tok)
-		default:
-			errInvalidToken(tok, "newline", t)
+		if err = filters.add(file, name); err != nil {
 			return
 		}
 	}
 
-	// make filters
-	lineFilter = makeFilter(lineFilters)
-	textFilter = makeFilter(textFilters)
+	lineFilter = seqFilter(filters.lineFilters)
+	textFilter = seqFilter(filters.textFilters)
 	return
 }
 
-func makeTokeniser(file io.Reader, errFunc func(*scanner.Scanner, string)) *scanner.Scanner {
-	tok := new(scanner.Scanner).Init(file)
-
-	tok.Mode = scanner.SkipComments | scanner.ScanComments | scanner.ScanIdents | scanner.ScanStrings | scanner.ScanRawStrings
-	tok.Whitespace = 1<<'\t' | 1<<'\r' | 1<<' '
-	tok.Error = errFunc
-	return tok
-}
-
-func errInvalidToken(tok *scanner.Scanner, msg string, t rune) {
-	tok.Error(tok, fmt.Sprintf("Expected %s, but found %s", msg, strconv.Quote(tok.TokenText())))
-}
-
-func skipNewLines(tok *scanner.Scanner) (t rune) {
-	for t = tok.Scan(); t == '\n'; t = tok.Scan() {
-		// empty
-	}
-
-	return
-}
-
-func makeWordFilter(match, subst []byte) func([]byte) []byte {
-	return func(s []byte) []byte {
-		return bytes.Replace(s, match, subst, -1)
-	}
-}
-
-func makeRegexFilter(re *regexp.Regexp, subst []byte) func([]byte) []byte {
-	return func(s []byte) []byte {
-		return re.ReplaceAll(s, subst)
-	}
-}
-
-func makeFilter(filters []func([]byte) []byte) func([]byte) []byte {
+func seqFilter(filters []func([]byte) []byte) func([]byte) []byte {
 	if len(filters) == 0 {
-		return dummyFilter
+		return func(s []byte) []byte { return s }
 	}
 
 	return func(s []byte) []byte {
@@ -437,12 +332,18 @@ func makeFilter(filters []func([]byte) []byte) func([]byte) []byte {
 	}
 }
 
-func dummyFilter(s []byte) []byte {
-	return s
+// 'filter' command line flag
+type filterNames []string
+
+func (flags filterNames) String() string {
+	return strings.Join(flags, " ")
 }
 
-// little helper functions
-func die(msg string) {
-	fmt.Fprintln(os.Stderr, "ERROR:", msg)
-	os.Exit(1)
+func (flags *filterNames) Set(val string) error {
+	if _, err := os.Stat(val); err != nil {
+		return err
+	}
+
+	*flags = append(*flags, val)
+	return nil
 }
