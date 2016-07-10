@@ -1,16 +1,17 @@
-// This is a comment
+// artefacts
+line regex	"\\s+['’\"`,›]+$"	""
+line regex	`\s{2,}`			" "
+line regex	"[—_-]{2,3}"		"—"
+line regex	`(\pL)[—_]$`		"${1}-"
+line regex	`(\pL)—(\pL)`		"${1}-${2}"
 
+// beautifiers
 line word	"..."  "…"
 
-// artefacts
-line regex	"\\s+(?:['’\"`,›]+)$"	""
-line regex	`[—_-]{2,3}`			"—"
-line regex	`(\pL)—$`				"${1}-"
-line regex	`(\pL)—(\pL)`			"${1}-${2}"
-
 // page numbers
-text regex `\n{2,}\d{1,3}-?\n+`	"\n\n"
+text regex 	`\n{2,}\d{1,3}-?\n{2,}`	"\n\n"
 
 // words join
-text regex `(\pL)-(?:\n+)`	"${1}"
+text regex `(\pL)-\n+`			"${1}"
+text regex `([^\n])\n([^\n])`	"${1} ${2}"
 

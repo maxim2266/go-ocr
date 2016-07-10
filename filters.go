@@ -46,7 +46,7 @@ type filterList struct {
 func (maker *filterList) add(input io.Reader, name string) (err error) {
 	// tokeniser
 	tok := makeTokeniser(input, func(t *scanner.Scanner, msg string) {
-		msg = fmt.Sprintf("Filter definition from \"%s\", line %d: %s.", name, t.Line, msg)
+		msg = fmt.Sprintf("Filter definition in \"%s\", line %d: %s.", name, t.Line, msg)
 		err = errors.New(msg)
 	})
 
