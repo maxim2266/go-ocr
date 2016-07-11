@@ -340,8 +340,14 @@ func (flags filterNames) String() string {
 }
 
 func (flags *filterNames) Set(val string) error {
-	if _, err := os.Stat(val); err != nil {
+	if info, err := os.Stat(val); err != nil {
+		if os.IsNotExist(err) {
+			err = errors.New("file not found")
+		}
+
 		return err
+	} else if !info.Mode().IsRegular() {
+		return errors.New("not a regular file")
 	}
 
 	*flags = append(*flags, val)
