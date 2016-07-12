@@ -47,16 +47,27 @@ import (
 	"unicode"
 )
 
+const usageFmt = `Usage: %s [OPTION]... FILE
+Extract text from scanned pdf document FILE; output directed to stdout.
+
+Options:
+  -first n        first page number (optional, default: 1)
+  -last  n        last page number (optional, default: last page of the document)
+  -filter FILE    filter specification file name (optional, may be given multile times)
+  -lang  xxx      document language (optional, default: eng)
+`
+
 var firstPage, lastPage uint
 var inputFileName, language string
 var filterSpecs filterNames
 
 func main() {
 	// command line parameters
-	flag.UintVar(&firstPage, "first", 1, "First page number")
-	flag.UintVar(&lastPage, "last", 0, "Last page number")
-	flag.StringVar(&language, "lang", "eng", "Document language")
-	flag.Var(&filterSpecs, "filter", "Filter specification file name")
+	flag.Usage = usage
+	flag.UintVar(&firstPage, "first", 1, "")
+	flag.UintVar(&lastPage, "last", 0, "")
+	flag.StringVar(&language, "lang", "eng", "")
+	flag.Var(&filterSpecs, "filter", "")
 	flag.Parse()
 
 	switch flag.NArg() {
@@ -292,6 +303,11 @@ func die(msg string) {
 	os.Exit(1)
 }
 
+func usage() {
+	fmt.Fprintf(os.Stderr, usageFmt, filepath.Base(os.Args[0]))
+}
+
+// fiter function maker
 func makeFilters() (lineFilter, textFilter func([]byte) []byte, err error) {
 	rules := new(ruleList)
 
