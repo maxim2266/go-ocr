@@ -98,9 +98,11 @@ Rule to remove all newline characters from the middle of a sentence:
 text regex	`([a-z\(\),])\n+([a-z\(\)])` "${1} ${2}"
 ```
 
-More examples can be found in the files `filter-eng` and `filter-rus`. Also, it is often useful to maintain
+More examples can be found in the files `filter-eng` and `filter-rus`.
+
+In practice, it is often useful to maintain
 one filter definition file with rules to remove common OCR artefacts, and another file with rules
-specific to a particular document. In general, it usually not possible to avoid all manual editing
+specific to a particular document. In general, it is probably impossible to avoid all manual editing
 altogether by using this tool, but from my experience, a few hours spent on setting up the appropriate filters
 for a 700 pages document can dramatically reduce the amount of manual work needed afterwards.
 
@@ -123,13 +125,13 @@ the `line` filters, if any, then assembled into one text string and passed throu
 `regexp` filters are implemented using [Regexp.ReplaceAll()](https://golang.org/pkg/regexp/#Regexp.ReplaceAll)
 function, and `word` filters are invocations of [bytes.Replace()](https://golang.org/pkg/bytes/#Replace) function.
 
-###### Platform: Linux (tested on Linux Mint 18 64bit)
+##### Platform
+Linux (tested on Linux Mint 18 64bit), will probably work on MacOS as well.
+
 ```bash
 $ go version
 go version go1.6.2 linux/amd64
 ```
 
-###### Lisence: BSD
-
-
+##### Lisence: BSD
 
