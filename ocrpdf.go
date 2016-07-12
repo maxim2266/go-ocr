@@ -293,7 +293,7 @@ func die(msg string) {
 }
 
 func makeFilters() (lineFilter, textFilter func([]byte) []byte, err error) {
-	filters := new(filterList)
+	rules := new(ruleList)
 
 	for _, name := range filterSpecs {
 		var file *os.File
@@ -304,24 +304,24 @@ func makeFilters() (lineFilter, textFilter func([]byte) []byte, err error) {
 
 		defer file.Close()
 
-		if err = filters.add(file, name); err != nil {
+		if err = rules.add(file, name); err != nil {
 			return
 		}
 	}
 
-	lineFilter = seqFilter(filters.lineFilters)
-	textFilter = seqFilter(filters.textFilters)
+	lineFilter = seqFilter(rules.lineRules)
+	textFilter = seqFilter(rules.textRules)
 	return
 }
 
-func seqFilter(filters []func([]byte) []byte) func([]byte) []byte {
-	if len(filters) == 0 {
+func seqFilter(rules []func([]byte) []byte) func([]byte) []byte {
+	if len(rules) == 0 {
 		return func(s []byte) []byte { return s }
 	}
 
 	return func(s []byte) []byte {
 		if len(s) > 0 {
-			for _, f := range filters {
+			for _, f := range rules {
 				if s = f(s); len(s) == 0 {
 					break
 				}

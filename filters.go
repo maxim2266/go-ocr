@@ -38,19 +38,19 @@ import (
 	"text/scanner"
 )
 
-type filterList struct {
-	lineFilters, textFilters []func([]byte) []byte
+type ruleList struct {
+	lineRules, textRules []func([]byte) []byte
 }
 
-// filter definition reader
-func (maker *filterList) add(input io.Reader, name string) (err error) {
+// filter rule definition reader
+func (maker *ruleList) add(input io.Reader, name string) (err error) {
 	// tokeniser
 	tok := makeTokeniser(input, func(t *scanner.Scanner, msg string) {
-		msg = fmt.Sprintf("Filter definition in \"%s\", line %d: %s.", name, t.Line, msg)
+		msg = fmt.Sprintf("Rule definition in \"%s\", line %d: %s.", name, t.Line, msg)
 		err = errors.New(msg)
 	})
 
-	// Filter spec format
+	// Rule spec format
 	//	scope type `match` `replacement`
 	// where
 	//	scope: 'line' | 'text'
@@ -60,23 +60,23 @@ func (maker *filterList) add(input io.Reader, name string) (err error) {
 	for t := skipNewLines(tok); t != scanner.EOF; {
 		// scope
 		if t != scanner.Ident {
-			errInvalidToken(tok, "filter scope", t)
+			errInvalidToken(tok, "rule scope", t)
 			return
 		}
 
-		scope := tok.TokenText()
+		ruleScope := tok.TokenText()
 
-		// filter type
+		// rule type
 		if t = tok.Scan(); t != scanner.Ident {
-			errInvalidToken(tok, "filter type", t)
+			errInvalidToken(tok, "rule type", t)
 			return
 		}
 
-		filterType := tok.TokenText()
+		ruleType := tok.TokenText()
 
 		// regex or word
 		if t = tok.Scan(); t != scanner.String {
-			errInvalidToken(tok, "regular expression or word", t)
+			errInvalidToken(tok, "regular expression or word string", t)
 			return
 		}
 
@@ -106,30 +106,30 @@ func (maker *filterList) add(input io.Reader, name string) (err error) {
 		}
 
 		// create filter function
-		var filterFunc func([]byte) []byte
+		var ruleFunc func([]byte) []byte
 
-		switch filterType {
+		switch ruleType {
 		case "word":
-			filterFunc = makeWordFilter([]byte(match), []byte(subst))
+			ruleFunc = makeWordRule([]byte(match), []byte(subst))
 		case "regex":
 			if re, e := regexp.Compile(match); e != nil {
 				tok.Error(tok, e.Error())
 				return
 			} else {
-				filterFunc = makeRegexFilter(re, []byte(subst))
+				ruleFunc = makeRegexRule(re, []byte(subst))
 			}
 		default:
-			tok.Error(tok, "Unknown filter type: "+filterType)
+			tok.Error(tok, "Unknown rule type: "+ruleType)
 			return
 		}
 
-		switch scope {
+		switch ruleScope {
 		case "line":
-			maker.lineFilters = append(maker.lineFilters, filterFunc)
+			maker.lineRules = append(maker.lineRules, ruleFunc)
 		case "text":
-			maker.textFilters = append(maker.textFilters, filterFunc)
+			maker.textRules = append(maker.textRules, ruleFunc)
 		default:
-			tok.Error(tok, "Unknown filter scope: "+scope)
+			tok.Error(tok, "Unknown rule scope: "+ruleScope)
 			return
 		}
 
@@ -169,13 +169,13 @@ func skipNewLines(tok *scanner.Scanner) (t rune) {
 	return
 }
 
-func makeWordFilter(match, subst []byte) func([]byte) []byte {
+func makeWordRule(match, subst []byte) func([]byte) []byte {
 	return func(s []byte) []byte {
 		return bytes.Replace(s, match, subst, -1)
 	}
 }
 
-func makeRegexFilter(re *regexp.Regexp, subst []byte) func([]byte) []byte {
+func makeRegexRule(re *regexp.Regexp, subst []byte) func([]byte) []byte {
 	return func(s []byte) []byte {
 		return re.ReplaceAll(s, subst)
 	}
