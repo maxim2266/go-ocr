@@ -22,22 +22,25 @@ The tool performs the following steps:
 ### Invocation
 Command line options:
 ```
-ocrpdf [-first n] [-last n] [-lang xxx] [-filter some-filter] input-file.pdf
+ocrpdf [(-f,--first) n] [(-l,--last) n] [(-L,--language) xxx] [(-F,--filter) some-filter] input-file.pdf
 ```
 
 where:
-- `-first` and `-last` specify the range of pages to process;
-- `-lang` argument specifies the language(s) of the document (default `eng`) and gets passed directly to `tesseract` tool;
-- `-filter` argument specifies the name of the file containing filter definitions. There may be multiple `-filter` options supplied for filter combination.
+- `--first` and `--last` specify the range of pages to process;
+- `--language` argument specifies the language(s) of the document (default `eng`) and gets passed directly to `tesseract` tool;
+- `--filter` argument specifies the name of the file containing filter definitions. There may be multiple `--filter` options supplied for filter combination.
 
 All these parameters are optional.
 
-The program always directs its output to stdout.
+The program always directs its output to `stdout`.
 
-For example, the following command processes a document in Russian, from page 12 to page 26 (inclusive),
+Run `ocrpdf --help` for the full list of options, or `ocrpdf --version` to display the program version.
+
+##### Example
+The following command processes a document in Russian, from page 12 to page 26 (inclusive),
 without any postprocessing, storing the result in the file `document.txt`:
 ```
-./ocrpdf -first 12 -last 26 -lang rus some.pdf > document.txt
+./ocrpdf --first 12 --last 26 --language rus some.pdf > document.txt
 ```
 
 ### Filter definitions

@@ -1,5 +1,5 @@
 BIN = ocrpdf
-SRC = ocrpdf.go filters.go
+SRC = ocrpdf.go filters.go cmdline.go
 
 .PHONY : debug release clean
 

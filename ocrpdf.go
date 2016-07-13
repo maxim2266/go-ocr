@@ -32,7 +32,6 @@ import (
 	"bytes"
 	"container/heap"
 	"errors"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -42,41 +41,18 @@ import (
 	"runtime"
 	"sort"
 	"strconv"
-	"strings"
 	"sync"
 	"unicode"
 )
 
-const usageFmt = `Usage: %s [OPTION]... FILE
-Extract text from scanned pdf document FILE; output directed to stdout.
-
-Options:
-  -first n        first page number (optional, default: 1)
-  -last  n        last page number (optional, default: last page of the document)
-  -filter FILE    filter specification file name (optional, may be given multile times)
-  -lang  xxx      document language (optional, default: eng)
-`
-
-var firstPage, lastPage uint
-var inputFileName, language string
-var filterSpecs filterNames
+var cmd *cmdLineOptions
 
 func main() {
-	// command line parameters
-	flag.Usage = usage
-	flag.UintVar(&firstPage, "first", 1, "")
-	flag.UintVar(&lastPage, "last", 0, "")
-	flag.StringVar(&language, "lang", "eng", "")
-	flag.Var(&filterSpecs, "filter", "")
-	flag.Parse()
+	var err error
 
-	switch flag.NArg() {
-	case 0:
-		die("Input file is not specified")
-	case 1:
-		inputFileName = flag.Arg(0)
-	default:
-		die("Too many input files")
+	// command line parameters
+	if cmd, err = parseCmdLine(); err != nil {
+		die(err.Error())
 	}
 
 	// read filters
@@ -133,13 +109,13 @@ func extractText(text *bytes.Buffer, filter func([]byte) []byte) (err error) {
 
 // 'pdfimages' driver
 func extractImages(dir string) error {
-	args := []string{"-tiff", "-f", strconv.Itoa(int(firstPage))}
+	args := []string{"-tiff", "-f", strconv.Itoa(int(cmd.first))}
 
-	if lastPage >= firstPage {
-		args = append(args, "-l", strconv.Itoa(int(lastPage)))
+	if cmd.last >= cmd.first {
+		args = append(args, "-l", strconv.Itoa(int(cmd.last)))
 	}
 
-	args = append(args, inputFileName, dir)
+	args = append(args, cmd.input, dir)
 
 	var msg bytes.Buffer
 
@@ -163,10 +139,10 @@ type ocrRequest struct {
 }
 
 func (req *ocrRequest) process() (text []byte, err error) {
-	text, err = exec.Command("tesseract", req.image, "-", "-l", language).Output()
+	text, err = exec.Command("tesseract", req.image, "-", "-l", cmd.language).Output()
 
 	if err != nil {
-		msg := fmt.Sprintf("(page %d) ", req.no+firstPage)
+		msg := fmt.Sprintf("(page %d) ", req.no+cmd.first)
 
 		if e, ok := err.(*exec.ExitError); ok {
 			if n := bytes.IndexByte(e.Stderr, '\n'); n >= 0 { // get first line only
@@ -221,7 +197,7 @@ func ocr(dir string, text *bytes.Buffer, filter func([]byte) []byte) error {
 	}
 
 	if len(files) == 0 {
-		return errors.New("No images found in file " + inputFileName)
+		return errors.New("No images found in file " + cmd.input)
 	}
 
 	if len(files) > 1 {
@@ -303,15 +279,11 @@ func die(msg string) {
 	os.Exit(1)
 }
 
-func usage() {
-	fmt.Fprintf(os.Stderr, usageFmt, filepath.Base(os.Args[0]))
-}
-
 // fiter function maker
 func makeFilters() (lineFilter, textFilter func([]byte) []byte, err error) {
 	rules := new(ruleList)
 
-	for _, name := range filterSpecs {
+	for _, name := range cmd.filters {
 		var file *os.File
 
 		if file, err = os.Open(name); err != nil {
@@ -346,26 +318,4 @@ func seqFilter(rules []func([]byte) []byte) func([]byte) []byte {
 
 		return s
 	}
-}
-
-// 'filter' command line flag
-type filterNames []string
-
-func (flags filterNames) String() string {
-	return strings.Join(flags, " ")
-}
-
-func (flags *filterNames) Set(val string) error {
-	if info, err := os.Stat(val); err != nil {
-		if os.IsNotExist(err) {
-			err = errors.New("file not found")
-		}
-
-		return err
-	} else if !info.Mode().IsRegular() {
-		return errors.New("not a regular file")
-	}
-
-	*flags = append(*flags, val)
-	return nil
 }
