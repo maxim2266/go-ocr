@@ -70,7 +70,25 @@ func main() {
 	}
 
 	// apply full-text filter
-	if _, err = os.Stdout.Write(textFilter(text.Bytes())); err != nil {
+	if len(cmd.output) == 0 {
+		_, err = os.Stdout.Write(textFilter(text.Bytes()))
+	} else {
+		var out *os.File
+
+		if out, err = os.OpenFile(cmd.output, os.O_WRONLY|os.O_TRUNC, 0666); err == nil {
+			defer func() {
+				if err == nil {
+					err = out.Close()
+				} else {
+					out.Close()
+				}
+			}()
+
+			_, err = out.Write(textFilter(text.Bytes()))
+		}
+	}
+
+	if err != nil {
 		die(err.Error())
 	}
 }

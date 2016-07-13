@@ -45,6 +45,7 @@ Options:
   -l,--last  N        last page number (optional, default: last page of the document)
   -F,--filter FILE    filter specification file name (optional, may be given multiple times)
   -L,--language LANG  document language (optional, default: 'eng')
+  -o,--output FILE    output file name (optional, default: stdout)
   -h,--help           display this help and exit
   -v,--version        output version information and exit
 `
@@ -55,9 +56,9 @@ Options:
 
 // command line arguments
 type cmdLineOptions struct {
-	first, last     uint
-	input, language string
-	filters         []string
+	first, last             uint
+	input, output, language string
+	filters                 []string
 }
 
 func parseCmdLine() (cmd *cmdLineOptions, err error) {
@@ -82,6 +83,10 @@ func parseCmdLine() (cmd *cmdLineOptions, err error) {
 			err = cmd.setLanguage(args.next())
 		case "-F", "--filter":
 			err = cmd.addFilter(args.next())
+		case "-o", "--output":
+			if cmd.output = args.next(); len(cmd.output) == 0 {
+				err = errors.New("Missing output file name")
+			}
 		case "-h", "--help":
 			showUsageAndExit()
 		case "-v", "--version":

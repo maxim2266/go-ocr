@@ -17,30 +17,25 @@ The tool performs the following steps:
 
 1. Images get extracted from the input file using `pdfimages` tool;
 2. The extracted images get converted to plain text using `tesseract` tool, in parallel;
-3. The specified filters get applied to the text, directing the result to `stdout`.
+3. The specified filters get applied to the text.
 
 ### Invocation
 Command line options:
 ```
-ocrpdf [(-f,--first) n] [(-l,--last) n] [(-L,--language) xxx] [(-F,--filter) some-filter] input-file.pdf
+-f,--first N        first page number (optional, default: 1)
+-l,--last  N        last page number (optional, default: last page of the document)
+-F,--filter FILE    filter specification file name (optional, may be given multiple times)
+-L,--language LANG  document language (optional, default: 'eng')
+-o,--output FILE    output file name (optional, default: stdout)
+-h,--help           display this help and exit
+-v,--version        output version information and exit
 ```
-
-where:
-- `--first` and `--last` specify the range of pages to process;
-- `--language` argument specifies the language(s) of the document (default `eng`) and gets passed directly to `tesseract` tool;
-- `--filter` argument specifies the name of the file containing filter definitions. There may be multiple `--filter` options supplied for filter combination.
-
-All these parameters are optional.
-
-The program always directs its output to `stdout`.
-
-Run `ocrpdf --help` for the full list of options, or `ocrpdf --version` to display the program version.
 
 ##### Example
-The following command processes a document in Russian, from page 12 to page 26 (inclusive),
+The following command processes a document `some.pdf` in Russian, from page 12 to page 26 (inclusive),
 without any postprocessing, storing the result in the file `document.txt`:
 ```
-./ocrpdf --first 12 --last 26 --language rus some.pdf > document.txt
+./ocrpdf --first 12 --last 26 --language rus --output document.txt some.pdf
 ```
 
 ### Filter definitions
