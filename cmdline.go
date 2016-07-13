@@ -43,8 +43,8 @@ Extract text from scanned pdf document FILE; output directed to stdout.
 Options:
   -f,--first N        first page number (optional, default: 1)
   -l,--last  N        last page number (optional, default: last page of the document)
-  -F,--filter FILE    filter specification file name (optional, may be given multile times)
-  -L,--lang  LANG     document language (optional, default: 'eng')
+  -F,--filter FILE    filter specification file name (optional, may be given multiple times)
+  -L,--language LANG  document language (optional, default: 'eng')
   -h,--help           display this help and exit
   -v,--version        output version information and exit
 `
@@ -109,7 +109,7 @@ func parseCmdLine() (cmd *cmdLineOptions, err error) {
 
 func setUint(target *uint, s, opt string, max uint) error {
 	if len(s) == 0 {
-		return fmt.Errorf("Missing argunment for the option \"%s\"", opt)
+		return fmt.Errorf("Missing argument for the option \"%s\"", opt)
 	}
 
 	val, err := strconv.Atoi(s)
@@ -128,7 +128,7 @@ func setUint(target *uint, s, opt string, max uint) error {
 
 func (cmd *cmdLineOptions) setLanguage(s string) error {
 	if len(s) == 0 {
-		return errors.New("Missing argunment for option \"--language\"")
+		return errors.New("Missing argument for option \"--language\"")
 	}
 
 	cmd.language = s
@@ -137,7 +137,7 @@ func (cmd *cmdLineOptions) setLanguage(s string) error {
 
 func (cmd *cmdLineOptions) addFilter(s string) error {
 	if len(s) == 0 {
-		return errors.New("Missing argunment for option \"--filter\"")
+		return errors.New("Missing argument for option \"--filter\"")
 	}
 
 	if info, err := os.Stat(s); err != nil {
