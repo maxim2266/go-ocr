@@ -157,15 +157,12 @@ func (cmd *cmdLineOptions) addFilter(s string) error {
 // argument strings reader
 type argReader []string
 
-func (args *argReader) next() string {
+func (args *argReader) next() (res string) {
 	if len(*args) > 0 {
-		var s string
-
-		s, *args = (*args)[0], (*args)[1:]
-		return s
+		res, *args = (*args)[0], (*args)[1:]
 	}
 
-	return ""
+	return
 }
 
 // "usage" display
