@@ -1,22 +1,22 @@
 // OCR artefacts
-line regex	`\s+`						" "		// normalise whitespace
-line word	"ﬁ"							"fi"	// remove non-English letter
+line regex  `\s+` " "    // normalise whitespace
+line word   "ﬁ"   "fi"   // remove non-English letter
 
 // Leading and trailing garbage
-line regex	`^['\\‘\.»]+\s`				""
-line regex	`^['\\‘\.,]+([[:alnum:]])`	"${1}"
-line regex	`['\\‘~_]+$`				""
-line regex	`\s+[\.\-';,~*:"”’\s]+$`	""
-line regex	",{2,}"						","
+line regex  `^['\\‘\.»]+\s`             ""
+line regex  `^['\\‘\.,]+([[:alnum:]])`  "${1}"
+line regex  `['\\‘~_]+$`                ""
+line regex  `\s+[\.\-';,~*:"”’\s]+$`    ""
+line regex  ",{2,}"                     ","
 
 // beautifiers
-line word 	"Www"						"www"
-line regex	`([a-z])—([a-z])`			"${1}-${2}"
+line word   "Www"               "www"
+line regex  `([a-z])—([a-z])`   "${1}-${2}"
 
 // join lines on '-'
-text regex	`([[:alpha:]])[—-]\n+([[:alpha:]])`	"${1}${2}"
+text regex  `([[:alpha:]])[—-]\n+([[:alpha:]])`  "${1}${2}"
 
 // join other lines to make paragraphs
-text regex	`([a-z\(\),])\n+([a-z\(\)])`		"${1} ${2}"
+text regex  `([a-z\(\),])\n+([a-z\(\)])`  "${1} ${2}"
 
 
