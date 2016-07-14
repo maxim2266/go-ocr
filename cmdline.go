@@ -50,7 +50,7 @@ Options:
   -v,--version        output version information and exit
 `
 
-	version  = "0.2.0"
+	version  = "0.3.0"
 	maxPages = 3000
 )
 
