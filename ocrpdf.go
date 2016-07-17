@@ -41,6 +41,7 @@ import (
 	"runtime"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"unicode"
 )
@@ -143,7 +144,13 @@ func extractImages(dir string) error {
 
 	if err != nil {
 		if _, ok := err.(*exec.ExitError); ok && msg.Len() > 0 {
-			err = errors.New(msg.String())
+			s := msg.String()
+
+			if strings.HasPrefix(s, "pdfimages") { // got 'usage' string instead of an error message
+				s = "Program 'pdfimages' exited with an error; parameters: " + strings.Join(args, " ")
+			}
+
+			err = errors.New(s)
 		}
 	}
 
