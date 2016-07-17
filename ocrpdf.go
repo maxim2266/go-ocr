@@ -148,6 +148,8 @@ func extractImages(dir string) error {
 
 			if strings.HasPrefix(s, "pdfimages") { // got 'usage' string instead of an error message
 				s = "Program 'pdfimages' exited with an error; parameters: " + strings.Join(args, " ")
+			} else {
+				s = strings.TrimSpace(s)
 			}
 
 			err = errors.New(s)
