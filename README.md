@@ -123,8 +123,11 @@ the `line` filters, if any, then assembled into one text string and passed throu
 `regexp` filters are implemented using [Regexp.ReplaceAll()](https://golang.org/pkg/regexp/#Regexp.ReplaceAll)
 function, and `word` filters are invocations of [bytes.Replace()](https://golang.org/pkg/bytes/#Replace) function.
 
+### Known issues
+Older versions of `pdfimages` tool do not have `-tiff` option, resulting in an error. 
+
 ##### Platform
-Linux (tested on Linux Mint 18 64bit), will probably work on MacOS as well.
+Linux (tested on Linux Mint 18 64bit, based on Ubuntu 16.04), will probably work on MacOS as well.
 
 ```bash
 $ go version
