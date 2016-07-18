@@ -74,7 +74,7 @@ expression is that of the Go `regexp` engine. The `substuitution` string may con
 [references](https://golang.org/pkg/regexp/#Regexp.Expand) to the content of capturing groups
 from the corresponding `match` regular expression. From the Go documentation, each reference
 
-> is denoted by a substring of the form $name or ${name}, where name is a non-empty sequence of letters, digits, and underscores. A purely numeric name like $1 refers to the submatch with the corresponding index; other names refer to capturing parentheses named with the (?P<name>...) syntax. A reference to an out of range or unmatched index or a name that is not present in the regular expression is replaced with an empty slice.
+> is denoted by a substring of the form $name or ${name}, where name is a non-empty sequence of letters, digits, and underscores. A purely numeric name like $1 refers to the submatch with the corresponding index; other names refer to capturing parentheses named with the (?P\<name\>...) syntax. A reference to an out of range or unmatched index or a name that is not present in the regular expression is replaced with an empty slice.
 
 > In the $name form, name is taken to be as long as possible: $1x is equivalent to ${1x}, not ${1}x, and, $10 is equivalent to ${10}, not ${1}0.
 
@@ -138,6 +138,7 @@ $ go version
 go version go1.6.2 linux/amd64
 $ tesseract --version
 tesseract 3.04.01
+...
 $ pdfimages --version
 pdfimages version 0.41.0
 ...
