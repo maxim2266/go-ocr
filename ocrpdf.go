@@ -38,6 +38,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
@@ -126,8 +127,20 @@ func extractText(text *bytes.Buffer, filter func([]byte) []byte) (err error) {
 	return ocr(dir, text, filter)
 }
 
-// 'pdfimages' driver
+// image extractor
 func extractImages(dir string) error {
+	switch ext := filepath.Ext(cmd.input); ext {
+	case ".pdf":
+		return pdfExtractImages(dir)
+	case ".djvu":
+		return djvuExtractImages(dir)
+	default:
+		return errors.New("Unknown file type: " + cmd.input)
+	}
+}
+
+// 'pdfimages' driver
+func pdfExtractImages(dir string) error {
 	args := []string{"-tiff", "-f", strconv.Itoa(int(cmd.first))}
 
 	if cmd.last >= cmd.first {
@@ -138,22 +151,56 @@ func extractImages(dir string) error {
 
 	var msg bytes.Buffer
 
-	cmd := exec.Command("pdfimages", args...)
-	cmd.Stderr = &msg
-	err := cmd.Run()
+	command := exec.Command("pdfimages", args...)
+	command.Stderr = &msg
+	err := command.Run()
 
-	if err != nil {
-		if _, ok := err.(*exec.ExitError); ok && msg.Len() > 0 {
-			s := msg.String()
+	if err == nil {
+		return nil
+	}
 
-			if strings.HasPrefix(s, "pdfimages") { // got 'usage' string instead of an error message
-				s = "Program 'pdfimages' exited with an error; parameters: " + strings.Join(args, " ")
-			} else {
-				s = strings.TrimSpace(s)
-			}
+	if _, ok := err.(*exec.ExitError); ok && msg.Len() > 0 {
+		s := msg.String()
 
-			err = errors.New(s)
+		if strings.HasPrefix(s, "pdfimages") { // got 'usage' string instead of an error message
+			s = "Program 'pdfimages' exited with an error; parameters: " + strings.Join(args, " ")
+		} else {
+			s = strings.TrimSpace(s)
 		}
+
+		err = errors.New(s)
+	}
+
+	return err
+}
+
+// 'ddjvu' driver
+func djvuExtractImages(dir string) error {
+	args := []string{"-format=tiff", "-mode=black", "-eachpage"} // -scale=600 (dpi) ?
+
+	if cmd.first <= cmd.last {
+		args = append(args, fmt.Sprintf("-page=%d-%d", cmd.first, cmd.last))
+	} else if cmd.first > 1 {
+		args = append(args, fmt.Sprintf("-page=%d-100000", cmd.first))
+	}
+
+	args = append(args, cmd.input, dir+"%05d.tif")
+
+	var msg bytes.Buffer
+
+	command := exec.Command("ddjvu", args...)
+	command.Stderr = &msg
+	err := command.Run()
+
+	if err == nil {
+		return nil
+	}
+
+	if _, ok := err.(*exec.ExitError); ok {
+		prefix := regexp.MustCompile(`^ddjvu:\s+(?:\[[^\]]*\]\s*)?`)
+		s, _ := msg.ReadBytes('\n')
+		s = bytes.TrimSpace(prefix.ReplaceAllLiteral(s, []byte{}))
+		err = errors.New(string(s))
 	}
 
 	return err
