@@ -1,9 +1,9 @@
-BIN = ocrpdf
-SRC = ocrpdf.go filters.go cmdline.go
+BIN = go-ocr
+SRC = ocr.go filters.go cmdline.go
 
 .PHONY : debug release clean
 
-release : GOFLAGS = -ldflags "-s"
+release : GOFLAGS = -ldflags="-s -w"
 
 debug release : $(BIN)
 

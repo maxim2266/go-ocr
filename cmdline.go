@@ -38,7 +38,7 @@ import (
 
 const (
 	usageFmt = `Usage: %s [OPTION]... FILE
-Extract text from scanned pdf document FILE; output directed to stdout.
+Extract text from a scanned pdf or djvu document FILE.
 
 Options:
   -f,--first N        first page number (optional, default: 1)

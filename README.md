@@ -1,9 +1,9 @@
-# OCRPDF
-A tool for extracting text from scanned documents, with post-processing.
+# go-ocr
+A tool for extracting plain text from scanned documents (`pdf` or `djvu`), with user-defined postprocessing.
 
 ### Motivation
 Once I had a task of OCR'ing a number of scanned documents in `pdf` format. I quickly built a pipeline
-of the tools to extract images from the input files and to convert them to text, but then I realised that
+of the tools to extract images from the input files and to convert them to plain text, but then I realised that
 modern OCR
 software is still less than ideal in terms of recognising text, so a good deal of postprocessing was needed
 in order to remove at least some of those OCR artefacts and irregularities. I ended up with a long pipeline
@@ -13,13 +13,15 @@ combine the OCR tools invocation with filters application, also giving an easy w
 the filter definitions.
 
 ### The tool
-The tool performs the following steps:
+Given an input file in either `pdf` or `djvu` format, the tool performs the following steps:
 
-1. Images get extracted from the input file using `pdfimages` tool;
+1. Images get extracted from the input file using `pdfimages` or `ddjvu` tool;
 2. The extracted images get converted to plain text using `tesseract` tool, in parallel;
 3. The specified filters get applied to the text.
 
 ### Invocation
+```go-ocr [OPTION]... FILE```
+
 Command line options:
 ```
 -f,--first N        first page number (optional, default: 1)
@@ -35,7 +37,7 @@ Command line options:
 The following command processes a document `some.pdf` in Russian, from page 12 to page 26 (inclusive),
 without any postprocessing, storing the result in the file `document.txt`:
 ```
-./ocrpdf --first 12 --last 26 --language rus --output document.txt some.pdf
+./go-ocr --first 12 --last 26 --language rus --output document.txt some.pdf
 ```
 
 ### Filter definitions
@@ -105,33 +107,44 @@ altogether by using this tool, but from my experience, a few hours spent on sett
 for a 700 pages document can dramatically reduce the amount of manual work needed afterwards.
 
 ### Other tools
-Internally the program relies on the tool `pdfimages` to extract images from the input file, and on `tesseract`
-program to do the actual OCR. The former tool is usually a part of `poppler-utils` package,
-while the latter is included in `tesseract-ocr` package. By default, the `tesseract` tool comes with the English
-language support only, other languages should be installed separately, for example, run `sudo apt install tesseract-ocr-rus`
+Internally the program relies on `pdfimages` and `ddjvu` tools for extracting images from the input file,
+and on `tesseract` program for the actual OCR'ing. The tool `pdfimages` is usually a part of `poppler-utils`
+package, the tool `ddjvu` comes from `djvulibre-bin` package, and `tesseract` is included in `tesseract-ocr`
+package. By default, `tesseract` comes with the English language support only, other languages
+should be installed separately, for example, run `sudo apt install tesseract-ocr-rus`
 to install the Russian language support. To find out what languages are currently installed type
 `tesseract --list-langs`.
 
 ### Compilation
 Invoke `make` (or `make debug`) from the directory of the project to compile the code with debug
-information included, or `make release` to compile without debug symbols. This creates executable file `ocrpdf`.
+information included, or `make release` to compile without debug symbols. This creates executable file `go-ocr`.
 
 ### Technical details
-The tool first runs the `pdfimages` program to extract images to a temporary directory, and then invokes
+The tool first runs `pdfimages` or `ddjvu` program to extract images to a temporary directory, and then invokes
 `tesseract` on each image in parallel to produce lines of plain text. Those lines are then passed through
 the `line` filters, if any, then assembled into one text string and passed through `text` filters, if any.
 `regexp` filters are implemented using [Regexp.ReplaceAll()](https://golang.org/pkg/regexp/#Regexp.ReplaceAll)
 function, and `word` filters are invocations of [bytes.Replace()](https://golang.org/pkg/bytes/#Replace) function.
 
 ### Known issues
-Older versions of `pdfimages` tool do not have `-tiff` option, resulting in an error. 
+Older versions of `pdfimages` tool do not have `-tiff` option, resulting in an error.
 
-##### Platform
+### Platform
 Linux (tested on Linux Mint 18 64bit, based on Ubuntu 16.04), will probably work on MacOS as well.
 
+Tools:
 ```bash
 $ go version
 go version go1.6.2 linux/amd64
+$ tesseract --version
+tesseract 3.04.01
+$ pdfimages --version
+pdfimages version 0.41.0
+...
+$ ddjvu --help
+DDJVU --- DjVuLibre-3.5.27
+...
+
 ```
 
 ##### Lisence: BSD
