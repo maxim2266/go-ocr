@@ -141,6 +141,10 @@ func extractImages(dir string) error {
 
 // 'pdfimages' driver
 func pdfExtractImages(dir string) error {
+	if err := checkPdfImageExtractor(); err != nil {
+		return err
+	}
+
 	args := []string{"-tiff", "-f", strconv.Itoa(int(cmd.first))}
 
 	if cmd.last >= cmd.first {
@@ -172,6 +176,27 @@ func pdfExtractImages(dir string) error {
 	}
 
 	return err
+}
+
+func checkPdfImageExtractor() error {
+	var help bytes.Buffer
+
+	command := exec.Command("pdfimages", "--help")
+	command.Stderr = &help
+
+	if err := command.Run(); err != nil {
+		return err
+	}
+
+	re := regexp.MustCompile(`^\s+-tiff\s+`)
+
+	for s, _ := help.ReadBytes('\n'); len(s) > 0; s, _ = help.ReadBytes('\n') {
+		if re.Match(s) {
+			return nil
+		}
+	}
+
+	return errors.New("Installed version of 'pdfimages' does not support '-tiff' option")
 }
 
 // 'ddjvu' driver
