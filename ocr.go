@@ -77,7 +77,7 @@ func main() {
 	} else {
 		var out *os.File
 
-		if out, err = os.OpenFile(cmd.output, os.O_WRONLY|os.O_TRUNC, 0666); err == nil {
+		if out, err = os.OpenFile(cmd.output, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666); err == nil {
 			defer func() {
 				if err == nil {
 					err = out.Close()
