@@ -147,12 +147,12 @@ func (cmd *cmdLineOptions) addFilter(s string) error {
 
 	if info, err := os.Stat(s); err != nil {
 		if os.IsNotExist(err) {
-			return errors.New("file not found")
+			return err
 		}
 
 		return err
 	} else if !info.Mode().IsRegular() {
-		return errors.New("not a file")
+		return fmt.Errorf("\"%s\" is not a file", s)
 	}
 
 	cmd.filters = append(cmd.filters, s)

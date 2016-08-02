@@ -30,7 +30,6 @@ package main
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"regexp"
@@ -46,9 +45,16 @@ type ruleList struct {
 func (maker *ruleList) add(input io.Reader, name string) (err error) {
 	// tokeniser
 	tok := makeTokeniser(input, func(t *scanner.Scanner, msg string) {
-		msg = fmt.Sprintf("Rule definition in \"%s\", line %d: %s.", name, t.Line, msg)
-		err = errors.New(msg)
+		err = fmt.Errorf("Rule definition in \"%s\", line %d: %s.", name, t.Line, msg)
 	})
+
+	fail := func(msg string) {
+		tok.Error(tok, msg)
+	}
+
+	failInvalidToken := func(msg string, t rune) {
+		fail(fmt.Sprintf("Expected %s, but found %s", msg, strconv.Quote(tok.TokenText())))
+	}
 
 	// Rule spec format
 	//	scope type `match` `replacement`
@@ -60,7 +66,7 @@ func (maker *ruleList) add(input io.Reader, name string) (err error) {
 	for t := skipNewLines(tok); t != scanner.EOF; {
 		// scope
 		if t != scanner.Ident {
-			errInvalidToken(tok, "rule scope", t)
+			failInvalidToken("rule scope", t)
 			return
 		}
 
@@ -68,7 +74,7 @@ func (maker *ruleList) add(input io.Reader, name string) (err error) {
 
 		// rule type
 		if t = tok.Scan(); t != scanner.Ident {
-			errInvalidToken(tok, "rule type", t)
+			failInvalidToken("rule type", t)
 			return
 		}
 
@@ -76,32 +82,32 @@ func (maker *ruleList) add(input io.Reader, name string) (err error) {
 
 		// regex or word
 		if t = tok.Scan(); t != scanner.String {
-			errInvalidToken(tok, "regular expression or word string", t)
+			failInvalidToken("match string", t)
 			return
 		}
 
 		var match string
 
 		if match, err = strconv.Unquote(tok.TokenText()); err != nil {
-			tok.Error(tok, "Regular expression or word string: "+err.Error())
+			fail("Match string: " + err.Error())
 			return
 		}
 
 		if len(match) == 0 {
-			tok.Error(tok, "Regular expression or word cannot be empty")
+			fail("Match string cannot be empty")
 			return
 		}
 
 		// substitution
 		if t = tok.Scan(); t != scanner.String {
-			errInvalidToken(tok, "substitution string", t)
+			failInvalidToken("substitution string", t)
 			return
 		}
 
 		var subst string
 
 		if subst, err = strconv.Unquote(tok.TokenText()); err != nil {
-			tok.Error(tok, "Invalid substitution string: "+err.Error())
+			fail("Invalid substitution string: " + err.Error())
 			return
 		}
 
@@ -113,13 +119,13 @@ func (maker *ruleList) add(input io.Reader, name string) (err error) {
 			ruleFunc = makeWordRule([]byte(match), []byte(subst))
 		case "regex":
 			if re, e := regexp.Compile(match); e != nil {
-				tok.Error(tok, e.Error())
+				fail(e.Error())
 				return
 			} else {
 				ruleFunc = makeRegexRule(re, []byte(subst))
 			}
 		default:
-			tok.Error(tok, "Unknown rule type: "+ruleType)
+			fail("Unknown rule type: " + ruleType)
 			return
 		}
 
@@ -129,7 +135,7 @@ func (maker *ruleList) add(input io.Reader, name string) (err error) {
 		case "text":
 			maker.textRules = append(maker.textRules, ruleFunc)
 		default:
-			tok.Error(tok, "Unknown rule scope: "+ruleScope)
+			fail("Unknown rule scope: " + ruleScope)
 			return
 		}
 
@@ -140,7 +146,7 @@ func (maker *ruleList) add(input io.Reader, name string) (err error) {
 		case '\n':
 			t = skipNewLines(tok)
 		default:
-			errInvalidToken(tok, "newline", t)
+			failInvalidToken("newline", t)
 			return
 		}
 	}
@@ -155,10 +161,6 @@ func makeTokeniser(input io.Reader, errFunc func(*scanner.Scanner, string)) *sca
 	tok.Whitespace = 1<<'\t' | 1<<'\r' | 1<<' '
 	tok.Error = errFunc
 	return tok
-}
-
-func errInvalidToken(tok *scanner.Scanner, msg string, t rune) {
-	tok.Error(tok, fmt.Sprintf("Expected %s, but found %s", msg, strconv.Quote(tok.TokenText())))
 }
 
 func skipNewLines(tok *scanner.Scanner) (t rune) {
