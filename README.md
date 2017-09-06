@@ -150,3 +150,5 @@ DDJVU --- DjVuLibre-3.5.27
 
 ##### Lisence: BSD
 
+### Remark
+Those who prefer more fine-grained control over the OCR process may want to take a look at [another project](https://github.com/maxim2266/OCR) where each step is performed by a separate tool.
