@@ -1,3 +1,7 @@
+_The project is based on older versions of `tesseract` and other tools, and is now superseded by 
+[another project](https://github.com/maxim2266/OCR)
+which allows for more granular control over the text recognition process._
+
 # go-ocr
 A tool for extracting plain text from scanned documents (`pdf` or `djvu`), with user-defined postprocessing.
 
@@ -149,6 +153,3 @@ DDJVU --- DjVuLibre-3.5.27
 ```
 
 ##### Lisence: BSD
-
-### Remark
-Those who prefer more fine-grained control over the OCR process may want to take a look at [another project](https://github.com/maxim2266/OCR) where each step is performed by a separate tool.
